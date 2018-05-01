@@ -1,0 +1,198 @@
+#include<fstream>
+#include<iostream>
+using namespace std;
+
+class Morph{
+	public:
+		int numRowsIMG, numColsIMG, minValIMG, maxValIMG, numRowsStructElem, numColsStructElem, minValStructElem, maxValStructElem, rowOrigin, colOrigin, rowFrameSize, colFrameSize;
+		int** imageArray;
+		int** morphArray;
+		int** morph2Array;
+		int** structElem;
+		Morph();
+		void loadImage(string,string);
+		void computeFrameSize(int,int);
+		void prettyPrint(int**,int,int);
+		void dilation(int**,int**);
+		void erosion(int**,int**);
+		void closing();
+		void opening();
+		void outputResult(string);
+};
+Morph::Morph(){
+	numRowsIMG=numColsIMG=minValIMG=maxValIMG=numRowsStructElem=numColsStructElem=minValStructElem=maxValStructElem=rowOrigin=colOrigin=rowFrameSize=colFrameSize=0;
+}
+void Morph::outputResult(string outFile){
+	ofstream out;
+	out.open(outFile);
+	out<<numRowsIMG<<" ";
+	out<<numColsIMG<<" ";
+	out<<minValIMG<<" ";
+	out<<maxValIMG<<endl;
+	for (int i=rowFrameSize; i<numRowsIMG+rowFrameSize; i++){
+		for (int j=colFrameSize; j<numColsIMG+colFrameSize; j++){
+			out<<morphArray[i][j];
+		}
+		out<<endl;
+	}
+	out.close();
+}
+void Morph::dilation(int** array, int** morph){
+	for (int i=rowFrameSize/2; i<numRowsIMG+rowFrameSize/2; i++){
+		for (int j=colFrameSize/2; j<numColsIMG+colFrameSize/2; j++){
+			if (array[i][j]==1){
+				int row=i-rowOrigin;
+				int col=j-colOrigin;
+				for (int r=0; r<numRowsStructElem; r++,row++){
+					for (int c=0; c<numColsStructElem; c++,col++){
+						morph[row][col]=structElem[r][c];
+					}
+					col=j-colOrigin;
+				}
+			}
+		}
+	}
+}
+void Morph::prettyPrint(int** array, int row, int col){
+	for (int i=0; i<row; i++){
+		for (int j=0; j<col; j++){
+			if (array[i][j]>0) cout<<array[i][j];
+			else cout<<" ";
+		}
+		cout<<endl;
+	}
+}
+void Morph::erosion(int** array, int** morph){
+	for (int i=rowFrameSize; i<numRowsIMG+rowFrameSize/2; i++){
+		for (int j=colFrameSize; j<numColsIMG+colFrameSize/2; j++){
+			int row=i-rowOrigin;
+			int col=j-colOrigin;
+			bool fit=true;
+			for (int r=0; r<numRowsStructElem; r++,row++){
+				for (int c=0; c<numColsStructElem; c++,col++){
+					if (array[row][col]!=1 && structElem[r][c]==1) fit=false;
+				}
+				col=j-colOrigin;
+			}
+			if (fit) morph[i][j]=1;
+		}
+	}
+}
+void Morph::opening(){
+	erosion(imageArray,morph2Array);
+	dilation(morph2Array,morphArray);
+}
+void Morph::closing(){
+	dilation(imageArray,morph2Array);
+	erosion(morph2Array,morphArray);
+}
+void Morph::loadImage(string in1, string in2){
+
+	
+	ifstream infile2(in2);
+	infile2>>numRowsStructElem;
+	infile2>>numColsStructElem;
+	infile2>>minValStructElem;
+	infile2>>maxValStructElem;
+	infile2>>rowOrigin;
+	infile2>>colOrigin;
+	structElem=new int*[numRowsStructElem];
+	for (int i=0; i<numRowsStructElem; i++){
+		structElem[i]=new int[numColsStructElem];
+	}
+	for (int i=0; i<numRowsStructElem; i++){
+		for (int j=0; j<numColsStructElem; j++){
+			structElem[i][j]=0;
+		}
+	}
+	int rowStruct=0;
+	int colStruct=0;
+	int valStruct;
+	while (infile2 >> valStruct){
+		structElem[rowStruct][colStruct]=valStruct;
+		if (colStruct==numColsStructElem-1) {
+			colStruct=0;
+			rowStruct++;
+		}
+		else colStruct++;
+	}
+	infile2.close();
+	computeFrameSize(numRowsStructElem,numColsStructElem);
+	
+	ifstream infile1(in1);
+	infile1>>numRowsIMG;
+	infile1>>numColsIMG;
+	infile1>>minValIMG;
+	infile1>>maxValIMG;
+	imageArray=new int*[numRowsIMG+rowFrameSize];
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		imageArray[i]=new int[numColsIMG+colFrameSize];
+	}
+	morphArray=new int*[numRowsIMG+rowFrameSize];
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		morphArray[i]=new int[numColsIMG+colFrameSize];
+	}
+	morph2Array=new int*[numRowsIMG+rowFrameSize];
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		morph2Array[i]=new int[numColsIMG+colFrameSize];
+	}
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		for (int j=0; j<numColsIMG+colFrameSize; j++){
+			imageArray[i][j]=0;
+		}
+	}
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		for (int j=0; j<numColsIMG+colFrameSize; j++){
+			morphArray[i][j]=0;
+		}
+	}
+	for (int i=0; i<numRowsIMG+rowFrameSize; i++){
+		for (int j=0; j<numColsIMG+colFrameSize; j++){
+			morph2Array[i][j]=0;
+		}
+	}
+	int row=rowFrameSize / 2;
+	int col=colFrameSize / 2;
+	int value;
+	while (infile1 >> value){
+		imageArray[row][col]=value;
+		if (col==numColsIMG + (colFrameSize / 2)-1) {
+			col=colFrameSize / 2;
+			row++;
+		}	
+		else col++;
+	}
+	infile1.close();
+	
+	
+}
+void Morph::computeFrameSize(int row, int col){
+	rowFrameSize=row;
+	colFrameSize=col;
+}
+int main(int argc, char* argv[]){
+	Morph mor;
+	mor.loadImage(argv[1],argv[2]);
+	cout<<"Input Image"<<endl;
+	mor.prettyPrint(mor.imageArray,mor.numRowsIMG+mor.rowFrameSize,mor.numColsIMG+mor.colFrameSize);
+	cout<<"Structuring Element"<<endl;
+	mor.prettyPrint(mor.structElem,mor.numRowsStructElem,mor.numColsStructElem);
+	for (int i=0; i<mor.numRowsIMG+mor.rowFrameSize; i++){
+		for (int j=0; j<mor.numColsIMG+mor.colFrameSize; j++){
+			mor.morphArray[i][j]=0;
+		}
+	}
+	char op=*argv[3];
+	if (op=='D') mor.dilation(mor.imageArray,mor.morphArray);
+	else if (op=='E') mor.erosion(mor.imageArray,mor.morphArray);
+	else if (op=='C') mor.closing();
+	else if (op=='O') mor.opening();
+	else {
+		cout<<"Did not choose a valid operation";
+		return 0;
+	}
+	
+	mor.outputResult(argv[4]);
+	
+	return 0;
+}
